@@ -1,0 +1,19 @@
+{
+    "name": "services",
+    "version": "1",
+    "dependencies": [
+        {
+            "name": "asio-grpc"
+        },
+        "boost-asio",
+        "boost-coroutine",
+        "boost-filesystem",
+        "boost-thread",
+        {
+            "name": "asio",
+            "features": [
+                "coroutine"
+            ]
+        }
+    ]
+}

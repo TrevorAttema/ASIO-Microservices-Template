@@ -1,0 +1,147 @@
+// Build: 
+// 1. protoc --grpc_out=. --plugin=protoc-gen-grpc=C:\Users\trevo\OneDrive\Documents\Projects\IPOC\vcpkg\installed\x64-windows\tools\grpc\grpc_cpp_plugin.exe services.accounts.proto
+// 2. protoc --cpp_out=. services.accounts.proto
+// 3. for dart - protoc --dart_out=grpc:lib/src/generated -Iprotos protos/services.accounts.proto
+
+syntax = "proto3";
+
+package Services;
+
+service Account {
+	rpc Login(LoginRequest) returns (LoginResponse) {}
+	rpc ResetPassword(PasswordRequest) returns (PasswordResponse) {}
+	rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse) {}
+	rpc UpdateAccount(UpdateAccountRequest) returns (UpdateAccountResponse) {}
+	rpc ReadAccount(ReadAccountRequest) returns (ReadAccountResponse) {}
+	rpc ListAccounts(ListAccountRequests) returns (ListAccountResponse) {}
+}
+
+enum AccountType {
+	USER = 0;
+	ADMIN = 1;
+}
+
+enum AccountActiveState {
+	ACTIVE = 0;
+	PAUSED = 1;
+}
+
+message AccountFields {
+	optional string first_name = 1;
+	optional string surname = 2;
+	optional string email = 3;
+	optional string sms = 4;
+	optional uint64 dob = 5;
+	optional string notes = 6;
+	optional bytes image = 7;
+	optional AccountActiveState active_state = 8;
+	optional uint64 created = 9;
+	optional uint64 updated = 10;
+	optional AccountType account_type = 11;
+}
+
+message AccountFieldSelect {
+	optional bool first_name = 1;
+	optional bool surname = 2;
+	optional bool email = 3;
+	optional bool sms = 4;
+	optional bool dob = 5;
+	optional bool notes = 6;
+	optional bool image = 7;
+	optional bool active_state = 8;
+	optional bool created = 9;
+	optional bool updated = 10;
+	optional bool account_type = 11;
+}
+
+enum AccountResponseStatus {
+	OK = 0;
+	ERROR_FIELD_INVALID = 1;
+	ERROR_PERMISSION = 2;
+}
+
+message CreateAccountRequest {
+	AccountFields fields = 1;
+	string password = 2;
+}
+
+message CreateAccountResponse {
+	enum Status {
+		OK = 0;
+		ERROR_ACCOUNT_EXISTS = 1;
+		ERROR_VALIDATION_ERROR = 2;
+	}
+	Status status = 1;
+	string message = 2;
+	string accountid = 3;
+}
+
+message LoginRequest {
+	string username = 1;
+	string password = 2;
+	string tfa_code = 3;		// Two factor authentication code
+}
+
+message LoginResponse {
+	enum Status {
+		OK = 0;
+		ERROR_LOGIN_FAILURE = 1;
+		ERROR_ACCOUNT_LOCKED = 2;
+	}
+	Status status = 1;
+	string message = 2;
+	string authkey = 3;
+	string accountId = 4;
+}
+
+message PasswordRequest {
+	string old_password = 1;
+	string new_password = 2;
+}
+
+message PasswordResponse {
+	enum Status {
+		OK = 0;
+		ERROR_PASSWORD_POLICY = 1;
+	}
+	Status status = 1;
+	string message = 2;
+}
+
+message UpdateAccountRequest {
+	string authkey = 1;
+	string accountId = 2;
+	AccountFields fields = 3;
+}
+
+message UpdateAccountResponse {
+	AccountResponseStatus status = 1;
+	string message = 2;
+	AccountFields fields = 3;
+}
+
+message ReadAccountRequest {
+	string authkey = 1;
+	string accountId = 2;
+
+}
+
+message ReadAccountResponse {
+	AccountResponseStatus status = 1;
+	string message = 2;
+	AccountFields fields = 3;
+}
+
+message ListAccountRequests {
+	string authkey = 1;
+	uint64 start = 2;
+	uint64 end = 3;
+	AccountFieldSelect fields = 4;
+}
+
+message ListAccountResponse {
+
+	AccountResponseStatus status = 1;
+	string message = 2;
+	repeated AccountFields fields = 3;
+}

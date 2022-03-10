@@ -211,99 +211,21 @@ struct ServerShutdown
 	f->set_email("email1");
 	return ::grpc::Status::OK;
 }
-boost::asio::awaitable<void> HandleLoginRequest(Services::Account::AsyncService& service)
+
+template<class reqType, class rspType, class receiverType, class handlerType>
+boost::asio::awaitable<void> HandleRequest(Services::Account::AsyncService& service, receiverType receiver, handlerType handler)
 {
 	grpc::ServerContext server_context;
-	::Services::LoginRequest request;
-	grpc::ServerAsyncResponseWriter<::Services::LoginResponse> writer{ &server_context };
-	if (!co_await agrpc::request(&Services::Account::AsyncService::RequestLogin, service, server_context,
+	reqType request;
+	grpc::ServerAsyncResponseWriter<rspType> writer{ &server_context };
+	if (!co_await agrpc::request(receiver, service, server_context,
 		request, writer))
 	{
 		co_return;
 	}
 
-	::Services::LoginResponse response;
-	auto status = Login(request, response);
-	co_await agrpc::finish(writer, response, status);
-}
-
-boost::asio::awaitable<void> HandleResetPasswordRequest(Services::Account::AsyncService& service)
-{
-	grpc::ServerContext server_context;
-	::Services::PasswordRequest request;
-	grpc::ServerAsyncResponseWriter<::Services::PasswordResponse> writer{ &server_context };
-	if (!co_await agrpc::request(&Services::Account::AsyncService::RequestResetPassword, service, server_context,
-		request, writer))
-	{
-		co_return;
-	}
-
-	::Services::PasswordResponse response;
-	auto status = ResetPassword(request, response);
-	co_await agrpc::finish(writer, response, status);
-}
-
-boost::asio::awaitable<void> HandleCreateAccountRequest(Services::Account::AsyncService& service)
-{
-	grpc::ServerContext server_context;
-	::Services::CreateAccountRequest request;
-	grpc::ServerAsyncResponseWriter<::Services::CreateAccountResponse> writer{ &server_context };
-	if (!co_await agrpc::request(&Services::Account::AsyncService::RequestCreateAccount, service, server_context,
-		request, writer))
-	{
-		co_return;
-	}
-
-	::Services::CreateAccountResponse response;
-	auto status = CreateAccount(request, response);
-	co_await agrpc::finish(writer, response, status);
-}
-
-boost::asio::awaitable<void> HandleUpdateAccountRequest(Services::Account::AsyncService& service)
-{
-	grpc::ServerContext server_context;
-	::Services::UpdateAccountRequest request;
-	grpc::ServerAsyncResponseWriter<::Services::UpdateAccountResponse> writer{ &server_context };
-	if (!co_await agrpc::request(&Services::Account::AsyncService::RequestUpdateAccount, service, server_context,
-		request, writer))
-	{
-		co_return;
-	}
-
-	::Services::UpdateAccountResponse response;
-	auto status = UpdateAccount(request, response);
-	co_await agrpc::finish(writer, response, status);
-}
-
-boost::asio::awaitable<void> HandleReadAccountRequest(Services::Account::AsyncService& service)
-{
-	grpc::ServerContext server_context;
-	::Services::ReadAccountRequest request;
-	grpc::ServerAsyncResponseWriter<::Services::ReadAccountResponse> writer{ &server_context };
-	if (!co_await agrpc::request(&Services::Account::AsyncService::RequestReadAccount, service, server_context,
-		request, writer))
-	{
-		co_return;
-	}
-
-	::Services::ReadAccountResponse response;
-	auto status = ReadAccount(request, response);
-	co_await agrpc::finish(writer, response, status);
-}
-
-boost::asio::awaitable<void> HandleListAccountsRequest(Services::Account::AsyncService& service)
-{
-	grpc::ServerContext server_context;
-	::Services::ListAccountRequests request;
-	grpc::ServerAsyncResponseWriter<::Services::ListAccountResponse> writer{ &server_context };
-	if (!co_await agrpc::request(&Services::Account::AsyncService::RequestListAccounts, service, server_context,
-		request, writer))
-	{
-		co_return;
-	}
-
-	::Services::ListAccountResponse response;
-	auto status = ListAccounts(request, response);
+	rspType response;
+	auto status = handler(request, response);
 	co_await agrpc::finish(writer, response, status);
 }
 
@@ -454,42 +376,67 @@ int main(int argc, const char** argv)
 		grpc_context,
 		[&]() -> boost::asio::awaitable<void>
 		{
-			co_await HandleLoginRequest(service);
+			//co_await HandleLoginRequest(service);
+			co_await HandleRequest<::Services::LoginRequest,
+				::Services::LoginResponse,
+				decltype(&Services::Account::AsyncService::RequestLogin),
+				decltype(Login)>
+				(service, &Services::Account::AsyncService::RequestLogin, &Login);
 		},
 		boost::asio::detached);
 	boost::asio::co_spawn(
 		grpc_context,
 		[&]() -> boost::asio::awaitable<void>
 		{
-			co_await HandleResetPasswordRequest(service);
+			co_await HandleRequest<::Services::PasswordRequest,
+				::Services::PasswordResponse,
+				decltype(&Services::Account::AsyncService::RequestResetPassword),
+				decltype(ResetPassword)>
+				(service, &Services::Account::AsyncService::RequestResetPassword, &ResetPassword);
 		},
 		boost::asio::detached);
 	boost::asio::co_spawn(
 		grpc_context,
 		[&]() -> boost::asio::awaitable<void>
 		{
-			co_await HandleCreateAccountRequest(service);
+			co_await HandleRequest<::Services::CreateAccountRequest,
+				::Services::CreateAccountResponse,
+				decltype(&Services::Account::AsyncService::RequestCreateAccount),
+				decltype(CreateAccount)>
+				(service, &Services::Account::AsyncService::RequestCreateAccount, &CreateAccount);
 		},
 		boost::asio::detached);
 	boost::asio::co_spawn(
 		grpc_context,
 		[&]() -> boost::asio::awaitable<void>
 		{
-			co_await HandleUpdateAccountRequest(service);
+			co_await HandleRequest<::Services::UpdateAccountRequest,
+				::Services::UpdateAccountResponse,
+				decltype(&Services::Account::AsyncService::RequestUpdateAccount),
+				decltype(UpdateAccount)>
+				(service, &Services::Account::AsyncService::RequestUpdateAccount, &UpdateAccount);
 		},
 		boost::asio::detached);
 	boost::asio::co_spawn(
 		grpc_context,
 		[&]() -> boost::asio::awaitable<void>
 		{
-			co_await HandleReadAccountRequest(service);
+			co_await HandleRequest<::Services::ReadAccountRequest,
+				::Services::ReadAccountResponse,
+				decltype(&Services::Account::AsyncService::RequestReadAccount),
+				decltype(ReadAccount)>
+				(service, &Services::Account::AsyncService::RequestReadAccount, &ReadAccount);
 		},
 		boost::asio::detached);
 	boost::asio::co_spawn(
 		grpc_context,
 		[&]() -> boost::asio::awaitable<void>
 		{
-			co_await HandleListAccountsRequest(service);
+			co_await HandleRequest<::Services::ListAccountRequests,
+				::Services::ListAccountResponse,
+				decltype(&Services::Account::AsyncService::RequestListAccounts),
+				decltype(ListAccounts)>
+				(service, &Services::Account::AsyncService::RequestListAccounts, &ListAccounts);
 		},
 		boost::asio::detached);
 

@@ -390,9 +390,47 @@ private:
 
 int main(int argc, char** argv)
 {
-	SAClient client(
-		grpc::CreateChannel("localhost:50051",
-			grpc::InsecureChannelCredentials()));
+	////////////////////////////////////
+	constexpr char kDummyRootCert[] =
+		"-----BEGIN CERTIFICATE-----\n"
+		"MIICwzCCAaugAwIBAgIJAM12DOkcaqrhMA0GCSqGSIb3DQEBBQUAMBQxEjAQBgNV\n"
+		"BAMTCWxvY2FsaG9zdDAeFw0yMDEwMDcwODIyNDFaFw0zMDEwMDUwODIyNDFaMBQx\n"
+		"EjAQBgNVBAMTCWxvY2FsaG9zdDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoC\n"
+		"ggEBALjJ8KPEpF0P4GjMPrJhjIBHUL0AX9E4oWdgJRCSFkPKKEWzQabTQBikMOhI\n"
+		"W4VvBMaHEBuECE5OEyrzDRiAO354I4F4JbBfxMOY8NIW0uWD6THWm2KkCzoZRIPW\n"
+		"yZL6dN+mK6cEH+YvbNuy5ZQGNjGG43tyiXdOCAc4AI9POeTtjdMpbbpR2VY4Ad/E\n"
+		"oTEiS3gNnN7WIAdgMhCJxjzvPwKszV3f7pwuTHzFMsuHLKr6JeaVUYfbi4DxxC8Z\n"
+		"k6PF6dLlLf3ngTSLBJyaXP1BhKMvz0TaMK3F0y2OGwHM9J8np2zWjTlNVEzffQZx\n"
+		"SWMOQManlJGs60xYx9KCPJMZZsMCAwEAAaMYMBYwFAYDVR0RBA0wC4IJbG9jYWxo\n"
+		"b3N0MA0GCSqGSIb3DQEBBQUAA4IBAQC0LrmbcNKgO+D50d/wOc+vhi9K04EZh8bg\n"
+		"WYAK1kLOT4eShbzqWGV/1EggY4muQ6ypSELCLuSsg88kVtFQIeRilA6bHFqQSj6t\n"
+		"sqgh2cWsMwyllCtmX6Maf3CLb2ZdoJlqUwdiBdrbIbuyeAZj3QweCtLKGSQzGDyI\n"
+		"KH7G8nC5d0IoRPiCMB6RnMMKsrhviuCdWbAFHop7Ff36JaOJ8iRa2sSf2OXE8j/5\n"
+		"obCXCUvYHf4Zw27JcM2AnnQI9VJLnYxis83TysC5s2Z7t0OYNS9kFmtXQbUNlmpS\n"
+		"doQ/Eu47vWX7S0TXeGziGtbAOKxbHE0BGGPDOAB/jGW/JVbeTiXY\n"
+		"-----END CERTIFICATE-----\n";
+	auto certificate_provider = std::make_shared<grpc::experimental::StaticDataCertificateProvider>(kDummyRootCert);
+	grpc::experimental::TlsChannelCredentialsOptions options;
+	options.set_certificate_provider(certificate_provider);
+	options.watch_root_certs();
+	options.set_root_cert_name("dummy");
+	struct NoOpTlsAuthorizationCheck
+		: public grpc::experimental::TlsServerAuthorizationCheckInterface {
+		int Schedule(grpc::experimental::TlsServerAuthorizationCheckArg* arg) override {
+			arg->set_success(1);
+			arg->set_status(GRPC_STATUS_OK);
+			return 0;
+		}
+	};
+	auto server_authorization_check = std::make_shared<NoOpTlsAuthorizationCheck>();
+	auto noop_auth_check_ = std::make_shared<grpc::experimental::TlsServerAuthorizationCheckConfig>(
+		server_authorization_check);
+	options.set_server_verification_option(GRPC_TLS_SKIP_ALL_SERVER_VERIFICATION);
+	options.set_server_authorization_check_config(noop_auth_check_);
+	////////////////////////////////////
+	auto channel_creds = grpc::experimental::TlsCredentials(options);
+	auto channel = grpc::CreateChannel("localhost:50051", channel_creds);
+	SAClient client(channel);
 
 	{
 		SAClient::loginRequest req{ "login1","pass1","mfa1" };

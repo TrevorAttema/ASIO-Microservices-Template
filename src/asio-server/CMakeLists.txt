@@ -3,7 +3,9 @@ cmake_minimum_required(VERSION 3.5.1)
 include_directories("${PROTOC_OUTPUT_DIR}")
 
 find_package(asio-grpc CONFIG REQUIRED)
-find_package(Boost REQUIRED COMPONENTS coroutine thread filesystem)
+find_package(Boost REQUIRED COMPONENTS coroutine thread filesystem program_options)
+
+add_compile_definitions(BOOST_ASIO_USE_TS_EXECUTOR_AS_DEFAULT=1)
 
 add_executable(asio_server sa_asioserver.cc)
 target_link_libraries(asio_server
@@ -11,5 +13,6 @@ target_link_libraries(asio_server
   ${_REFLECTION}
   ${_GRPC_GRPCPP}
   ${_PROTOBUF_LIBPROTOBUF}
+  Boost::program_options
   asio-grpc::asio-grpc
 )

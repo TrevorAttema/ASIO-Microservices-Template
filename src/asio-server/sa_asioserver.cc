@@ -1,19 +1,25 @@
 #include <string>
 
 #include <grpcpp/grpcpp.h>
-
-#include "services.accounts.grpc.pb.h"
+#include <grpcpp/server.h>
+#include <grpcpp/server_builder.h>
 
 #include <agrpc/asioGrpc.hpp>
 #include <boost/asio/bind_executor.hpp>
 #include <boost/asio/detached.hpp>
 #include <boost/asio/experimental/awaitable_operators.hpp>
 #include <boost/asio/signal_set.hpp>
-#include <grpcpp/server.h>
-#include <grpcpp/server_builder.h>
+
+#include <boost/program_options.hpp>
 
 #include <optional>
 #include <thread>
+#include <fstream>
+#include <filesystem>
+
+#include "services.accounts.grpc.pb.h"
+
+namespace po = boost::program_options;
 
 struct ServerShutdown
 {
@@ -301,18 +307,143 @@ boost::asio::awaitable<void> HandleListAccountsRequest(Services::Account::AsyncS
 	co_await agrpc::finish(writer, response, status);
 }
 
+struct Options
+{
+	std::string port;
+	std::string cert;
+	std::string key;
+};
+
+bool GetOptions(Options& options, int ac, const char** av)
+{
+	try
+	{
+
+		po::options_description desc("Allowed options");
+		desc.add_options()
+			("help", "produce help message")
+			("port", po::value<int>(), "set port number")
+			("cert", po::value<std::string>(), "specify certificate")
+			("key", po::value<std::string>(), "specify private key for certificate")
+			;
+
+		po::variables_map vm;
+		po::store(po::parse_command_line(ac, av, desc), vm);
+		po::notify(vm);
+
+		if (vm.count("help") || ac == 1)
+		{
+			std::cout << desc << "\n";
+			return 0;
+		}
+		if (vm.count("port"))
+		{
+			options.port = std::to_string(vm["port"].as<int>());
+		}
+		else
+		{
+			options.port = "50051";
+		}
+		if (vm.count("cert"))
+		{
+			options.cert = vm["cert"].as<std::string>();
+		}
+		else
+		{
+			throw std::exception("cert must be given");
+		}
+		if (vm.count("key"))
+		{
+			options.key = vm["key"].as<std::string>();
+		}
+		else
+		{
+			throw std::exception("key must be given");
+		}
+	}
+	catch (std::exception& e)
+	{
+		std::cerr << "error: " << e.what() << "\n";
+		return false;
+	}
+	catch (...)
+	{
+		std::cerr << "Exception of unknown type!\n";
+	}
+	return true;
+}
+
+namespace fs = std::filesystem; 
+bool GetDataFromFile(const std::string& path, std::string& data)
+{
+	std::vector<std::uint8_t> v;
+	try
+	{
+		std::basic_fstream<std::uint8_t> dataStream(path.c_str(), std::ios::in | std::ios::binary);
+		if (dataStream.fail())
+		{
+			return false;
+		}
+
+		auto dataSize = fs::file_size(path);
+
+		v.resize(dataSize);
+		dataStream.read(v.data(), dataSize);
+
+		if (dataStream.fail())
+		{
+			return false;
+		}
+		data.assign(v.begin(), v.end());
+		return true;
+	}
+	catch (...)
+	{
+		return false;
+	}
+}
+
 int main(int argc, const char** argv)
 {
-    const auto port = argc >= 2 ? argv[1] : "50051";
-    const auto host = std::string("0.0.0.0:") + port;
+	Options options;
+	if (!GetOptions(options, argc, argv))
+		return 0;
+
+    const auto host = std::string("0.0.0.0:") + options.port;
 
 	std::cout << "Server listening on " << host << std::endl;
 	std::cout << "Press Ctrl-C to terminate" << std::endl;
 	std::unique_ptr<grpc::Server> server;
 
+	std::string servercert;
+	std::string serverkey;
+	if (!GetDataFromFile(options.cert, servercert))
+	{
+		std::cout << "error reading cert file" << std::endl;
+		return 0;
+	}
+	if (!GetDataFromFile(options.key, serverkey))
+	{
+		std::cout << "error reading key file" << std::endl;
+		return 0;
+	}
+
+	std::cout << "servercert.size() = " << servercert.size() << std::endl;
+	std::cout << "serverkey.size() = " << serverkey.size() << std::endl;
+	grpc::SslServerCredentialsOptions::PemKeyCertPair pkcp;
+	pkcp.private_key = serverkey;
+	pkcp.cert_chain = servercert;
+
+	grpc::SslServerCredentialsOptions ssl_opts;
+	ssl_opts.pem_root_certs = "";
+	ssl_opts.pem_key_cert_pairs.push_back(pkcp);
+
+	std::shared_ptr<grpc::ServerCredentials> creds;
+	creds = grpc::SslServerCredentials(ssl_opts);
+
 	grpc::ServerBuilder builder;
     agrpc::GrpcContext grpc_context{builder.AddCompletionQueue()};
-	builder.AddListeningPort(host, grpc::InsecureServerCredentials());
+	builder.AddListeningPort(host, creds);
 	Services::Account::AsyncService service;
     builder.RegisterService(&service);
 	server = builder.BuildAndStart();

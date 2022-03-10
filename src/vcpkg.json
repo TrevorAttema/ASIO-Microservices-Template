@@ -8,6 +8,7 @@
         "boost-asio",
         "boost-coroutine",
         "boost-filesystem",
+        "boost-program-options",
         "boost-thread",
         {
             "name": "asio",

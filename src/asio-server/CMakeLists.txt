@@ -7,7 +7,7 @@ find_package(Boost REQUIRED COMPONENTS coroutine thread filesystem program_optio
 
 add_compile_definitions(BOOST_ASIO_USE_TS_EXECUTOR_AS_DEFAULT=1)
 
-add_executable(asio_server sa_asioserver.cc)
+add_executable(asio_server sa_asioserver.cc authServer.h authServer.cpp)
 target_link_libraries(asio_server
   sa_grpc_proto
   ${_REFLECTION}

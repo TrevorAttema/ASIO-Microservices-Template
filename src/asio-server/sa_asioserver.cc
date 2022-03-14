@@ -99,7 +99,6 @@ bool GetOptions(Options& options, int ac, const char** av)
 {
 	try
 	{
-
 		po::options_description desc("Allowed options");
 		desc.add_options()
 			("help", "produce help message")

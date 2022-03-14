@@ -1,395 +1,64 @@
-#include <chrono>
-#include <iostream>
 #include <memory>
-#include <random>
-#include <string>
-#include <thread>
 
-#include <grpc/grpc.h>
-#include <grpcpp/channel.h>
-#include <grpcpp/client_context.h>
 #include <grpcpp/create_channel.h>
 #include <grpcpp/security/credentials.h>
-#include "services.accounts.grpc.pb.h"
+#include <boost/program_options.hpp>
+#include <boost/asio/signal_set.hpp>
 
-using grpc::Channel;
-using grpc::ClientContext;
-using grpc::ClientReader;
-using grpc::ClientReaderWriter;
-using grpc::ClientWriter;
-using grpc::Status;
-using Services::Account;
+#include "SAClient.h"
 
-class SAClient
+struct Options
 {
-public:
-	struct loginRequest
-	{
-		std::string username;
-		std::string password;
-		std::string tfa_code;
-	};
-
-	struct loginResponse
-	{
-		Services::LoginResponse_Status status;
-		std::string message;
-		std::string authkey;
-		std::string accountId;
-	};
-
-	struct passwordRequest
-	{
-		std::string old_password;
-		std::string new_password;
-	};
-
-	struct passwordResponse
-	{
-		Services::PasswordResponse_Status status;
-		std::string message;
-	};
-
-	enum class AccountFieldsFlags
-	{
-		first_name =	1 << 0,
-		surname =		1 << 1,
-		email =			1 << 2,
-		sms =			1 << 3,
-		dob =			1 << 4,
-		notes =			1 << 5,
-		image =			1 << 6,
-		active_state =	1 << 7,
-		created =		1 << 8,
-		updated =		1 << 9,
-		account_type =	1 << 10,
-	};
-
-	struct AccountFields
-	{
-		std::uint32_t mask;
-		std::string first_name;
-		std::string surname;
-		std::string email;
-		std::string sms;
-		std::uint64_t dob;
-		std::string notes;
-		std::string image;
-		Services::AccountActiveState active_state;
-		std::uint64_t created;
-		std::uint64_t updated;
-		Services::AccountType account_type;
-	};
-
-	struct createAccountRequest
-	{
-		AccountFields fields;
-		std::string password;
-	};
-
-	struct createAccountResponse
-	{
-		Services::CreateAccountResponse_Status status;
-		std::string message;
-	};
-
-	struct updateAccountRequest
-	{
-		std::string authkey;
-		std::string accountId;
-		AccountFields fields;
-	};
-
-	struct updateAccountResponse
-	{
-		Services::AccountResponseStatus status;
-		std::string message;
-		AccountFields fields;
-	};
-
-	struct readAccountRequest
-	{
-		std::string authkey;
-		std::string accountId;
-	};
-
-	struct readAccountResponse
-	{
-		Services::AccountResponseStatus status;
-		std::string message;
-		AccountFields fields;
-	};
-
-	struct AccountFieldSelect
-	{
-		std::uint32_t mask;
-	};
-
-	struct listAccountsRequest
-	{
-		std::string authkey;
-		std::uint64_t start;
-		std::uint64_t end;
-		AccountFieldSelect fields;
-	};
-
-	struct listAccountsResponse
-	{
-		Services::AccountResponseStatus status;
-		std::string message;
-		std::vector<AccountFields> fields;
-	};
-
-	SAClient(std::shared_ptr<Channel> channel)
-		: stub_(Account::NewStub(channel))
-	{
-	}
-
-	::grpc::Status Login(const loginRequest &req, loginResponse &rsp)
-	{
-		::Services::LoginRequest request;
-		::Services::LoginResponse response;
-		request.set_username(req.username);
-		request.set_password(req.password);
-		request.set_tfa_code(req.tfa_code);
-		ClientContext context;
-		Status status = stub_->Login(&context, request, &response);
-		if (!status.ok())
-		{
-			return status;
-		}
-		rsp.status = response.status();
-		rsp.message = response.message();
-		rsp.authkey = response.authkey();
-		rsp.accountId = response.accountid();
-		return status;
-	}
-
-	::grpc::Status ResetPassword(const passwordRequest &req, passwordResponse &rsp)
-	{
-		::Services::PasswordRequest request;
-		::Services::PasswordResponse response;
-		request.set_old_password(req.old_password);
-		request.set_new_password(req.new_password);
-		ClientContext context;
-		Status status = stub_->ResetPassword(&context, request, &response);
-		if (!status.ok())
-		{
-			return status;
-		}
-		rsp.status = response.status();
-		rsp.message = response.message();
-		return status;
-	}
-
-	void SetProtoFieldsFromFields(::Services::AccountFields* f, const AccountFields &fields)
-	{
-		std::uint32_t mask = fields.mask;
-		if (mask & (std::uint32_t)AccountFieldsFlags::first_name)
-			f->set_first_name(fields.first_name);
-		if (mask & (std::uint32_t)AccountFieldsFlags::surname)
-			f->set_surname(fields.surname);
-		if (mask & (std::uint32_t)AccountFieldsFlags::email)
-			f->set_email(fields.email);
-		if (mask & (std::uint32_t)AccountFieldsFlags::sms)
-			f->set_sms(fields.sms);
-		if (mask & (std::uint32_t)AccountFieldsFlags::dob)
-			f->set_dob(fields.dob);
-		if (mask & (std::uint32_t)AccountFieldsFlags::notes)
-			f->set_notes(fields.notes);
-		if (mask & (std::uint32_t)AccountFieldsFlags::image)
-			f->set_image(fields.image);
-		if (mask & (std::uint32_t)AccountFieldsFlags::active_state)
-			f->set_active_state(fields.active_state);
-		if (mask & (std::uint32_t)AccountFieldsFlags::created)
-			f->set_created(fields.created);
-		if (mask & (std::uint32_t)AccountFieldsFlags::updated)
-			f->set_updated(fields.updated);
-		if (mask & (std::uint32_t)AccountFieldsFlags::account_type)
-			f->set_account_type(fields.account_type);
-	}
-
-	void SetAccountFieldSelectFromMask(::Services::AccountFieldSelect* f, std::int32_t mask)
-	{
-		if (mask & (std::uint32_t)AccountFieldsFlags::first_name)
-			f->set_first_name(true);
-		if (mask & (std::uint32_t)AccountFieldsFlags::surname)
-			f->set_surname(true);
-		if (mask & (std::uint32_t)AccountFieldsFlags::email)
-			f->set_email(true);
-		if (mask & (std::uint32_t)AccountFieldsFlags::sms)
-			f->set_sms(true);
-		if (mask & (std::uint32_t)AccountFieldsFlags::dob)
-			f->set_dob(true);
-		if (mask & (std::uint32_t)AccountFieldsFlags::notes)
-			f->set_notes(true);
-		if (mask & (std::uint32_t)AccountFieldsFlags::image)
-			f->set_image(true);
-		if (mask & (std::uint32_t)AccountFieldsFlags::active_state)
-			f->set_active_state(true);
-		if (mask & (std::uint32_t)AccountFieldsFlags::created)
-			f->set_created(true);
-		if (mask & (std::uint32_t)AccountFieldsFlags::updated)
-			f->set_updated(true);
-		if (mask & (std::uint32_t)AccountFieldsFlags::account_type)
-			f->set_account_type(true);
-	}
-
-	void SetFieldsFromProtoFields(AccountFields &fields, const ::Services::AccountFields &f)
-	{
-		fields.mask = 0;
-		if (f.has_first_name())
-		{
-			fields.mask |= (std::uint32_t)AccountFieldsFlags::first_name;
-			fields.first_name = f.first_name();
-		}
-		if (f.has_surname())
-		{
-			fields.mask |= (std::uint32_t)AccountFieldsFlags::surname;
-			fields.surname = f.surname();
-		}
-		if (f.has_email())
-		{
-			fields.mask |= (std::uint32_t)AccountFieldsFlags::email;
-			fields.email = f.email();
-		}
-		if (f.has_sms())
-		{
-			fields.mask |= (std::uint32_t)AccountFieldsFlags::sms;
-			fields.sms = f.sms();
-		}
-		if (f.has_dob())
-		{
-			fields.mask |= (std::uint32_t)AccountFieldsFlags::dob;
-			fields.dob = f.dob();
-		}
-		if (f.has_notes())
-		{
-			fields.mask |= (std::uint32_t)AccountFieldsFlags::notes;
-			fields.notes = f.notes();
-		}
-		if (f.has_image())
-		{
-			fields.mask |= (std::uint32_t)AccountFieldsFlags::image;
-			fields.image = f.image();
-		}
-		if (f.has_active_state())
-		{
-			fields.mask |= (std::uint32_t)AccountFieldsFlags::active_state;
-			fields.active_state = f.active_state();
-		}
-		if (f.has_created())
-		{
-			fields.mask |= (std::uint32_t)AccountFieldsFlags::created;
-			fields.created = f.created();
-		}
-		if (f.has_updated())
-		{
-			fields.mask |= (std::uint32_t)AccountFieldsFlags::updated;
-			fields.updated = f.updated();
-		}
-		if (f.has_account_type())
-		{
-			fields.mask |= (std::uint32_t)AccountFieldsFlags::account_type;
-			fields.account_type = f.account_type();
-		}
-	}
-
-	::grpc::Status CreateAccount(const createAccountRequest &req, createAccountResponse &rsp)
-	{
-		::Services::CreateAccountRequest request;
-		::Services::CreateAccountResponse response;
-		request.set_password(req.password);
-		auto f = request.mutable_fields();
-		SetProtoFieldsFromFields(f, req.fields);
-
-		ClientContext context;
-		Status status = stub_->CreateAccount(&context, request, &response);
-		if (!status.ok())
-		{
-			return status;
-		}
-		rsp.status = response.status();
-		rsp.message = response.message();
-		return status;
-	}
-
-	::grpc::Status UpdateAccount(const updateAccountRequest &req, updateAccountResponse &rsp)
-	{
-		::Services::UpdateAccountRequest request;
-		::Services::UpdateAccountResponse response;
-		request.set_accountid(req.accountId);
-		request.set_authkey(req.authkey);
-		auto f = request.mutable_fields();
-		SetProtoFieldsFromFields(f, req.fields);
-
-		ClientContext context;
-		Status status = stub_->UpdateAccount(&context, request, &response);
-		if (!status.ok())
-		{
-			return status;
-		}
-		auto f1 = response.fields();
-		SetFieldsFromProtoFields(rsp.fields, f1);
-		rsp.status = response.status();
-		rsp.message = response.message();
-		return status;
-	}
-
-	::grpc::Status ReadAccount(const readAccountRequest &req, readAccountResponse &rsp)
-	{
-		::Services::ReadAccountRequest request;
-		::Services::ReadAccountResponse response;
-		request.set_accountid(req.accountId);
-		request.set_authkey(req.authkey);
-		ClientContext context;
-		Status status = stub_->ReadAccount(&context, request, &response);
-		if (!status.ok())
-		{
-			return status;
-		}
-		auto f1 = response.fields();
-		SetFieldsFromProtoFields(rsp.fields, f1);
-		rsp.status = response.status();
-		rsp.message = response.message();
-		return status;
-	}
-
-	::grpc::Status ListAccounts(const listAccountsRequest &req, listAccountsResponse &rsp)
-	{
-		::Services::ListAccountRequests request;
-		::Services::ListAccountResponse response;
-		request.set_authkey(req.authkey);
-		request.set_start(req.start);
-		request.set_end(req.end);
-		SetAccountFieldSelectFromMask(request.mutable_fields(), req.fields.mask);
-		ClientContext context;
-		Status status = stub_->ListAccounts(&context, request, &response);
-		if (!status.ok())
-		{
-			return status;
-		}
-		rsp.status = response.status();
-		rsp.message = response.message();
-		int n = response.fields_size();
-		rsp.fields.clear();
-		for (int j = 0; j < n; j++)
-		{
-			auto f = response.fields(j);
-			AccountFields fields;
-			SetFieldsFromProtoFields(fields, f);
-			rsp.fields.push_back(fields);
-		}
-		return status;
-	}
-
-private:
-
-	std::unique_ptr<Account::Stub> stub_;
+	int numThreads{ 0 };
 };
 
-int main(int argc, char** argv)
+namespace po = boost::program_options;
+bool GetOptions(Options& options, int ac, const char** av)
 {
+	try
+	{
+		po::options_description desc("Allowed options");
+		desc.add_options()
+			("help", "produce help message")
+			("threads", po::value<int>(), "set number of threads. If not given, the test will run once")
+			;
+
+		po::variables_map vm;
+		po::store(po::parse_command_line(ac, av, desc), vm);
+		po::notify(vm);
+
+		if (vm.count("help"))
+		{
+			std::cout << desc << "\n";
+			return 0;
+		}
+		if (vm.count("threads"))
+		{
+			options.numThreads = (vm["threads"].as<int>());
+		}
+		else
+		{
+			options.numThreads = 0;
+		}
+	}
+	catch (std::exception& e)
+	{
+		std::cerr << "error: " << e.what() << "\n";
+		return false;
+	}
+	catch (...)
+	{
+		std::cerr << "Exception of unknown type!\n";
+	}
+	return true;
+}
+
+int main(int argc, const char** argv)
+{
+	Options options;
+	if (!GetOptions(options, argc, argv))
+		return 0;
+	std::cout << "options.numThreads = " << options.numThreads << "\n";
 	////////////////////////////////////
 	constexpr char kDummyRootCert[] =
 		"-----BEGIN CERTIFICATE-----\n"
@@ -410,10 +79,10 @@ int main(int argc, char** argv)
 		"doQ/Eu47vWX7S0TXeGziGtbAOKxbHE0BGGPDOAB/jGW/JVbeTiXY\n"
 		"-----END CERTIFICATE-----\n";
 	auto certificate_provider = std::make_shared<grpc::experimental::StaticDataCertificateProvider>(kDummyRootCert);
-	grpc::experimental::TlsChannelCredentialsOptions options;
-	options.set_certificate_provider(certificate_provider);
-	options.watch_root_certs();
-	options.set_root_cert_name("dummy");
+	grpc::experimental::TlsChannelCredentialsOptions credOptions;
+	credOptions.set_certificate_provider(certificate_provider);
+	credOptions.watch_root_certs();
+	credOptions.set_root_cert_name("dummy");
 	struct NoOpTlsAuthorizationCheck
 		: public grpc::experimental::TlsServerAuthorizationCheckInterface {
 		int Schedule(grpc::experimental::TlsServerAuthorizationCheckArg* arg) override {
@@ -425,10 +94,10 @@ int main(int argc, char** argv)
 	auto server_authorization_check = std::make_shared<NoOpTlsAuthorizationCheck>();
 	auto noop_auth_check_ = std::make_shared<grpc::experimental::TlsServerAuthorizationCheckConfig>(
 		server_authorization_check);
-	options.set_server_verification_option(GRPC_TLS_SKIP_ALL_SERVER_VERIFICATION);
-	options.set_server_authorization_check_config(noop_auth_check_);
+	credOptions.set_server_verification_option(GRPC_TLS_SKIP_ALL_SERVER_VERIFICATION);
+	credOptions.set_server_authorization_check_config(noop_auth_check_);
 	////////////////////////////////////
-	auto channel_creds = grpc::experimental::TlsCredentials(options);
+	auto channel_creds = grpc::experimental::TlsCredentials(credOptions);
 	auto channel = grpc::CreateChannel("localhost:50051", channel_creds);
 	SAClient client(channel);
 

@@ -4,7 +4,7 @@ include_directories("${PROTOC_OUTPUT_DIR}")
 
 find_package(Boost REQUIRED COMPONENTS program_options)
 
-add_executable(sa_client sa_client.cc SAClient.h SAClient.cpp)
+add_executable(sa_client sa_client.cc SAClient.h SAClient.cpp TestRunner.h TestRunner.cpp)
 target_link_libraries(sa_client
   sa_grpc_proto
   ${_REFLECTION}

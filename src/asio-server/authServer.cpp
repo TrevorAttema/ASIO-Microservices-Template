@@ -280,7 +280,6 @@ void authServer::run()
 
 ::grpc::Status authServer::ListAccounts(const ::Services::ListAccountRequests& request, ::Services::ListAccountResponse& response)
 {
-	std::cout << "ListAccounts" << std::endl;
 	std::cout << "ListAccounts: authkey  = " << request.authkey() << ", start = " << request.start() << ", end = " << request.end() << std::endl;
 	response.set_message("message1");
 	response.set_status(Services::AccountResponseStatus::ERROR_FIELD_INVALID);

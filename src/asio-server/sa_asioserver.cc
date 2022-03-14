@@ -174,8 +174,8 @@ int main(int argc, const char** argv)
 	std::cout << "Press Ctrl-C to terminate" << std::endl;
 
 	authServer as(options);
-	as.run();
 	ServerShutdown server_shutdown{ as.getServer(), as.getContext() };
+	as.run();
 
     std::cout << "exiting\n";
 }

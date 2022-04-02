@@ -15,3 +15,5 @@ add_subdirectory ("proto")
 add_subdirectory ("client")
 add_subdirectory ("server")
 add_subdirectory ("asio-server")
+add_subdirectory ("async-server")
+

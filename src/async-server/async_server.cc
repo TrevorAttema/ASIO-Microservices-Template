@@ -2,11 +2,13 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <signal.h>
 
 #include <grpc/support/log.h>
 #include <grpcpp/grpcpp.h>
 
 #include <boost/program_options.hpp>
+#include <boost/asio.hpp>
 
 #include <fstream>
 #include <filesystem>
@@ -115,13 +117,6 @@ bool GetOptions(Options& options, int ac, const char** av)
 	return true;
 }
 
-HANDLE hEvent;
-BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
-{
-	SetEvent(hEvent);
-	return TRUE;
-}
-
 int main(int argc, const char** argv)
 {
 	//--user odb_test --database odb_test
@@ -136,15 +131,16 @@ int main(int argc, const char** argv)
 		});
 	std::cout << "Press Ctrl-C to terminate" << std::endl;
 
-	SetConsoleCtrlHandler(CtrlHandler, TRUE);
-
-	hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	std::cout << "Waiting for event" << std::endl;
-	WaitForSingleObject(hEvent, INFINITE);
+	boost::asio::io_service service;
+	boost::asio::signal_set signals(service, SIGINT, SIGTERM);
+	signals.async_wait(
+		[=](boost::system::error_code /*ec*/, int /*signo*/)
+		{
+		});
+	service.run();
 
 	as.shutdown();
 	t.join();
 
-	std::cout << "exiting" << std::endl;
 	return 0;
 }

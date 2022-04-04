@@ -5,6 +5,7 @@
 
 #include <grpc/support/log.h>
 #include <grpcpp/grpcpp.h>
+#include <boost/asio.hpp>
 
 #include "services.accounts.grpc.pb.h"
 
@@ -170,18 +171,6 @@ public:
 };
 
 std::unique_ptr<Server> server;
-HANDLE hEvent;
-BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
-{
-	std::cout << "CtrlHandler: calling server->Shutdown()" << std::endl;
-	server->Shutdown();
-	std::cout << "CtrlHandler: calling server->Wait()" << std::endl;
-	server->Wait();
-	std::cout << "CtrlHandler: shutdown completed" << std::endl;
-	SetEvent(hEvent);
-	return TRUE;
-}
-
 void RunServer()
 {
 	std::string server_address("0.0.0.0:50051");
@@ -194,10 +183,19 @@ void RunServer()
 	std::cout << "Server listening on " << server_address << std::endl;
 	std::cout << "Press Ctrl-C to terminate" << std::endl;
 
-	hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	SetConsoleCtrlHandler(CtrlHandler, TRUE);
+	boost::asio::io_service aservice;
+	boost::asio::signal_set signals(aservice, SIGINT, SIGTERM);
+	signals.async_wait(
+		[=](boost::system::error_code /*ec*/, int /*signo*/)
+		{
+			std::cout << "CtrlHandler: calling server->Shutdown()" << std::endl;
+			server->Shutdown();
+			std::cout << "CtrlHandler: calling server->Wait()" << std::endl;
+			server->Wait();
+			std::cout << "CtrlHandler: shutdown completed" << std::endl;
+		});
 	std::cout << "Waiting for event" << std::endl;
-	WaitForSingleObject(hEvent, INFINITE);
+	aservice.run();
 }
 
 int main(int argc, char** argv)

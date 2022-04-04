@@ -22,28 +22,6 @@ authServer::authServer(const Options& options)
 	server = builder.BuildAndStart();
 }
 
-#if 0
-void CreateAccountCallData::Proceed()
-{
-	std::cout << "CreateAccountCallData::Proceed: _status = " << (int)_status << std::endl;
-}
-
-void UpdateAccountCallData::Proceed()
-{
-	std::cout << "UpdateAccountCallData::Proceed: _status = " << (int)_status << std::endl;
-}
-
-void ReadAccountCallData::Proceed()
-{
-	std::cout << "ReadAccountCallData::Proceed: _status = " << (int)_status << std::endl;
-}
-
-void ListAccountsCallData::Proceed()
-{
-	std::cout << "ListAccountsCallData::Proceed: _status = " << (int)_status << std::endl;
-}
-#endif
-
 void authServer::HandleRPCs()
 {
 	using LoginCallData = CallData<Services::LoginRequest, Services::LoginResponse, authServer, Services::Account::AsyncService,

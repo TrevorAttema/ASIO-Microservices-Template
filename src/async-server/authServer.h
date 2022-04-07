@@ -21,6 +21,9 @@ struct Options
 	std::string keyPath;
 	std::string servercert;
 	std::string serverkey;
+	int threadCount;
+	int queueCount;
+	int callDataCount;
 	//std::unique_ptr<odb::database> db;
 };
 
@@ -28,8 +31,9 @@ class authServer
 {
 private:
 	std::unique_ptr<grpc::Server> server;
-	std::unique_ptr<grpc::ServerCompletionQueue> queue;
+	std::vector<std::unique_ptr<grpc::ServerCompletionQueue>> m_cq;
 	Services::Account::AsyncService service;
+	Options m_options;
 
 public:
 	authServer(const Options& options);
@@ -37,7 +41,7 @@ public:
 	void shutdown();
 
 private:
-	void HandleRPCs();
+	void HandleRPCs(int n);
 
 	::grpc::Status Login(const ::Services::LoginRequest& request, ::Services::LoginResponse& response);
 	::grpc::Status ResetPassword(const ::Services::PasswordRequest& request, ::Services::PasswordResponse& response);

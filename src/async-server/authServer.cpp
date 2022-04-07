@@ -1,11 +1,12 @@
 #include "authServer.h"
 
 authServer::authServer(const Options& options)
+	: m_options(options)
 {
 	grpc::ServerBuilder builder;
 	grpc::SslServerCredentialsOptions::PemKeyCertPair pkcp;
-	pkcp.private_key = options.serverkey;
-	pkcp.cert_chain = options.servercert;
+	pkcp.private_key = m_options.serverkey;
+	pkcp.cert_chain = m_options.servercert;
 
 	grpc::SslServerCredentialsOptions ssl_opts;
 	ssl_opts.pem_root_certs = "";
@@ -13,16 +14,38 @@ authServer::authServer(const Options& options)
 
 	auto creds = grpc::SslServerCredentials(ssl_opts);
 
-	const auto host = std::string("localhost:") + options.port;
+	const auto host = std::string("localhost:") + m_options.port;
 	std::cout << "Server listening on " << host << std::endl;
 
+	std::cout << "authServer::authServer: queueCount = " << m_options.queueCount << ", threadCount = " << m_options.threadCount << std::endl;
 	builder.AddListeningPort(host, creds);
 	builder.RegisterService(&service);
-	queue = builder.AddCompletionQueue();
+	for (int j = 0; j < m_options.queueCount; j++)
+	{
+		m_cq.emplace_back(builder.AddCompletionQueue());
+	}
 	server = builder.BuildAndStart();
 }
 
-void authServer::HandleRPCs()
+void authServer::run()
+{
+	std::vector<std::thread*> threads;
+	for (int n = 0; n < m_cq.size(); n++)
+	{
+		for (int j = 0; j < m_options.threadCount; j++)
+		{
+			threads.emplace_back(new std::thread(&authServer::HandleRPCs, this, n));
+		}
+	}
+
+	std::cout << "authServer::run: threads.size() = " << threads.size() << std::endl;
+	for (const auto& t : threads)
+	{
+		t->join();
+	}
+}
+
+void authServer::HandleRPCs(int n)
 {
 	using LoginCallData = CallData<Services::LoginRequest, Services::LoginResponse, authServer, Services::Account::AsyncService,
 		decltype(&Services::Account::AsyncService::RequestLogin), decltype(&authServer::Login)>;
@@ -37,25 +60,28 @@ void authServer::HandleRPCs()
 	using ListAccountsCallData = CallData<Services::ListAccountRequests, Services::ListAccountResponse, authServer, Services::Account::AsyncService,
 		decltype(&Services::Account::AsyncService::RequestListAccounts), decltype(&authServer::ListAccounts)>;
 
-	std::cout << "authServer::HandleRPCs: entry" << std::endl;
-	auto cd1 = new LoginCallData(&service, queue.get(), this,
+	auto& queue = m_cq[n];
+	for (int j = 0; j < m_options.callDataCount; j++)
+	{
+		auto cd1 = new LoginCallData(&service, queue.get(), this,
 			&Services::Account::AsyncService::RequestLogin, &authServer::Login);
-	auto cd2 = new ResetPasswordCallData(&service, queue.get(), this,
+		auto cd2 = new ResetPasswordCallData(&service, queue.get(), this,
 			&Services::Account::AsyncService::RequestResetPassword, &authServer::ResetPassword);
-	auto cd3 = new CreateAccountCallData(&service, queue.get(), this,
+		auto cd3 = new CreateAccountCallData(&service, queue.get(), this,
 			&Services::Account::AsyncService::RequestCreateAccount, &authServer::CreateAccount);
-	auto cd4 = new UpdateAccountCallData(&service, queue.get(), this,
+		auto cd4 = new UpdateAccountCallData(&service, queue.get(), this,
 			&Services::Account::AsyncService::RequestUpdateAccount, &authServer::UpdateAccount);
-	auto cd5 = new ReadAccountCallData(&service, queue.get(), this,
+		auto cd5 = new ReadAccountCallData(&service, queue.get(), this,
 			&Services::Account::AsyncService::RequestReadAccount, &authServer::ReadAccount);
-	auto cd6 = new ListAccountsCallData(&service, queue.get(), this,
+		auto cd6 = new ListAccountsCallData(&service, queue.get(), this,
 			&Services::Account::AsyncService::RequestListAccounts, &authServer::ListAccounts);
-	cd1->Proceed();
-	cd2->Proceed();
-	cd3->Proceed();
-	cd4->Proceed();
-	cd5->Proceed();
-	cd6->Proceed();
+		cd1->Proceed();
+		cd2->Proceed();
+		cd3->Proceed();
+		cd4->Proceed();
+		cd5->Proceed();
+		cd6->Proceed();
+	}
 	void* tag;
 	bool ok;
 	while (queue->Next(&tag, &ok))
@@ -73,20 +99,16 @@ void authServer::HandleRPCs()
 			}
 		}
 	}
-	std::cout << "authServer::HandleRPCs: exit" << std::endl;
-}
-
-void authServer::run()
-{
-	HandleRPCs();
 }
 
 void authServer::shutdown()
 {
 	std::cout << "authServer::shutdown: calling server->Shutdown()" << std::endl;
 	server->Shutdown();
-	std::cout << "authServer::shutdown: calling queue->Shutdown()" << std::endl;
-	queue->Shutdown();
+	for (int n = 0; n < m_cq.size(); n++)
+	{
+		m_cq[n]->Shutdown();
+	}
 	std::cout << "calling server->Wait()" << std::endl;
 	server->Wait();
 	std::cout << "shutdown completed" << std::endl;
@@ -166,51 +188,51 @@ void authServer::shutdown()
 
 ::grpc::Status authServer::UpdateAccount(const ::Services::UpdateAccountRequest& request, ::Services::UpdateAccountResponse& response)
 {
-	std::cout << "AccountsImpl::UpdateAccount: accountid = " << request.accountid() << ", authkey = " << request.authkey() << std::endl;
+	std::cout << "UpdateAccount: accountid = " << request.accountid() << ", authkey = " << request.authkey() << std::endl;
 	auto f = request.fields();
 	if (f.has_first_name())
 	{
-		std::cout << "AccountsImpl::UpdateAccount: first_name = " << f.first_name() << std::endl;
+		std::cout << "UpdateAccount: first_name = " << f.first_name() << std::endl;
 	}
 	if (f.has_surname())
 	{
-		std::cout << "AccountsImpl::UpdateAccount: surname = " << f.surname() << std::endl;
+		std::cout << "UpdateAccount: surname = " << f.surname() << std::endl;
 	}
 	if (f.has_email())
 	{
-		std::cout << "AccountsImpl::UpdateAccount: email = " << f.email() << std::endl;
+		std::cout << "UpdateAccount: email = " << f.email() << std::endl;
 	}
 	if (f.has_sms())
 	{
-		std::cout << "AccountsImpl::UpdateAccount: sms = " << f.sms() << std::endl;
+		std::cout << "UpdateAccount: sms = " << f.sms() << std::endl;
 	}
 	if (f.has_dob())
 	{
-		std::cout << "AccountsImpl::UpdateAccount: dob = " << f.dob() << std::endl;
+		std::cout << "UpdateAccount: dob = " << f.dob() << std::endl;
 	}
 	if (f.has_notes())
 	{
-		std::cout << "AccountsImpl::UpdateAccount: notes = " << f.notes() << std::endl;
+		std::cout << "UpdateAccount: notes = " << f.notes() << std::endl;
 	}
 	if (f.has_image())
 	{
-		std::cout << "AccountsImpl::UpdateAccount: image size = " << f.image().size() << std::endl;
+		std::cout << "UpdateAccount: image size = " << f.image().size() << std::endl;
 	}
 	if (f.has_active_state())
 	{
-		std::cout << "AccountsImpl::UpdateAccount: active_state = " << f.active_state() << std::endl;
+		std::cout << "UpdateAccount: active_state = " << f.active_state() << std::endl;
 	}
 	if (f.has_created())
 	{
-		std::cout << "AccountsImpl::UpdateAccount: created = " << f.created() << std::endl;
+		std::cout << "UpdateAccount: created = " << f.created() << std::endl;
 	}
 	if (f.has_updated())
 	{
-		std::cout << "AccountsImpl::UpdateAccount: updated = " << f.updated() << std::endl;
+		std::cout << "UpdateAccount: updated = " << f.updated() << std::endl;
 	}
 	if (f.has_account_type())
 	{
-		std::cout << "AccountsImpl::UpdateAccount: account_type = " << f.account_type() << std::endl;
+		std::cout << "UpdateAccount: account_type = " << f.account_type() << std::endl;
 	}
 	response.set_message("message1");
 	response.set_status(Services::AccountResponseStatus::ERROR_FIELD_INVALID);

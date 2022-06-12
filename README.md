@@ -1,7 +1,9 @@
 # ASIO-Microservices-Template
-ASIO high performance microservice template is designed to demonstrate an authentication microservice in a simple and easy to use way. If you plan to develop massively scalable micro-services for your application and would like to minimise server costs then this template might help guide the way.
+Finding ASIO examples for C++ online can be challenging. When I started learning ASIO, the example provided by the gRPC project demonstrated a single ASIO method implementation, not an entire microservice. With thanks to Hàn Long https://github.com/chungphb/grpc-cpp for his ideas, this boilerplate code implements an entire ASIO micro-service.
 
-The code is designed to maximise server resources and minimise power consumption through performance and optimisation. The service has been designed to handle large numbers of synchronous client connections so theoretically it is possible to handle over 500K simultaneous client connections on a single server but this needs to be tested. Database persistence has not been added but different databases can be used to service async service calls.
+This ASIO high performance microservice template demonstrates how to build an entire microservice in C++. But why C++, when it's easier to code in other languages? If you plan to develop massively scalable microservices and would like to minimise server cost and monthly subscription fees then C++ is arguably the most efficient in terms of speed and memory utilisation.
+
+The code is designed to maximise server resources and minimise power consumption through performance and optimisation. The service has been designed to handle large numbers of synchronous client connections so theoretically it is possible to handle over 500K simultaneous client connections on a single server (with appropriate memory and SSD IO) but this needs to be properly tested. Database persistence has not been added but different databases can be used to service async service calls.
 
 Language: C++
 Threading: Asynchronous input/output - ASIO

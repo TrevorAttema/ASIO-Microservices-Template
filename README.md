@@ -1,5 +1,7 @@
-# ASIO Microservice Boilerplate for C++
-Finding ASIO examples for C++ online can be challenging. When I started learning ASIO, the example provided by the gRPC project demonstrated a single ASIO method implementation, not an entire microservice. With thanks to Hàn Long https://github.com/chungphb/grpc-cpp for his ideas, this boilerplate code implements an entire ASIO micro-service through C++ templates.
+# ASIO Async Microservice Boilerplate for C++
+Finding ASIO async microservice examples for C++ online can be challenging. When I started learning ASIO, the example provided by the gRPC project demonstrated a single ASIO method implementation, not an entire microservice. The STL version was too complex but thanks to Hàn Long https://github.com/chungphb/grpc-cpp for his ideas, this boilerplate code was born.
+
+If you are new to ASIO Async, try building the example code found on Hans github before trying this code.
 
 This ASIO high performance microservice should be used as the basis for building your own ASIO microservice in C++. But why C++, when it's easier to code in other languages? If you plan to develop massively scalable microservices and would like to minimise server resourcesthen C++ is arguably the most efficient in terms of speed and memory efficiency.
 

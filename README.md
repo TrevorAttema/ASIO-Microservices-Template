@@ -1,7 +1,9 @@
 # ASIO Async Microservice Boilerplate for C++
-Finding ASIO async microservice examples for C++ online can be challenging. When I started learning ASIO, the example provided by the gRPC project demonstrated a single ASIO method implementation, not an entire microservice. The STL version was too complex but thanks to Hàn Long https://github.com/chungphb/grpc-cpp for his ideas, this boilerplate code was born.
+This template demonstrates how to build Asynchronous Input Output (ASIO) micro-services using Google RPC (gRPC) and protocol buffers.
 
-If you are new to ASIO Async, try building the example code found on Hans github before trying this code.
+gRPC is a high performance framework that efficently connects services in and across data centres, mobile devices and IoT nodes. With load balancing, tracing, health checking and authentication, gRPC make it easy to build applications that can scale on limited server resources, saving resources and power. Protocol buffers is how structured data is serialised over the wire/air. It's like XML, JSON, but faster and simpler.
+
+Finding ASIO async microservice examples for C++ online can be challenging. When I started learning ASIO, the example provided by the gRPC project demonstrated a single ASIO method implementation, not an entire microservice. The STL version was too complex but thanks to Hàn Long https://github.com/chungphb/grpc-cpp for his ideas, this boilerplate code was born.
 
 This ASIO high performance microservice should be used as the basis for building your own ASIO microservice in C++. But why C++, when it's easier to code in other languages? If you plan to develop massively scalable microservices and would like to minimise server resourcesthen C++ is arguably the most efficient in terms of speed and memory efficiency.
 
@@ -11,8 +13,6 @@ Language: C++
 Threading: Asynchronous input/output - ASIO
 Remote procedure calls: gRPC https://grpc.io/
 Data transfer: protocol buffers https://developers.google.com/protocol-buffers
-
-gRPC was chosen for it's lightweight performance and scalability. Protocol buffers was chosen for performance and interface versioning features.
 
 Next steps
 - Test load and capacity
